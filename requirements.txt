@@ -1,3 +1,4 @@
-requests
+streamlit>=1.31.0
 pandas
-streamlit
+requests
+altair<5.0
