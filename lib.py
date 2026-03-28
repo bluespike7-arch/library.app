@@ -36,17 +36,16 @@ def get_library_list(api_key, region_code, sub_region_name=None):
         return lib_dict
     except: return {}
 
-def get_data(api_key, age, lib_code):
+def get_data(api_key, age, gender, lib_code):
     if not api_key: return "API 키를 먼저 입력해주세요.", None
     url = "http://data4library.kr/api/loanItemSrch"
     last_month = datetime.now().replace(day=1) - timedelta(days=1)
     params = {
         'authKey': api_key, 'startDt': last_month.replace(day=1).strftime('%Y-%m-%d'),
         'endDt': last_month.strftime('%Y-%m-%d'), 'pageSize': 30, 'format': 'json',
-        'age': age, 'libCode': lib_code
+        'age': age, 'gender': gender, 'libCode': lib_code
     }
     try:
-        # 에러가 났던 부분을 안전한 문법으로 수정
         response = requests.get(url, params=params)
         res = response.json()
         docs = res.get('response', {}).get('docs', [])
@@ -68,12 +67,16 @@ lib_list = get_library_list(api_key, REGION_DATA[main_region]["code"], selected_
 selected_lib_name = st.sidebar.selectbox("4. 도서관 선택", ["해당 지역 전체"] + list(lib_list.keys()))
 selected_lib_code = lib_list.get(selected_lib_name, "")
 
+# 연령대 및 성별 선택 추가
 age_dict = {"전체": "", "영유아(0-5세)": "0", "유아(6-7세)": "6", "초등(8-13세)": "8", "청소년(14-19세)": "14", "20대": "20", "30대": "30", "40대": "40", "50대": "50", "60대 이상": "60"}
 selected_age = st.sidebar.selectbox("5. 연령대 선택", list(age_dict.keys()))
 
+gender_dict = {"전체": "", "남성": "0", "여성": "1"} # API 기준: 남성 0, 여성 1
+selected_gender = st.sidebar.selectbox("6. 성별 선택", list(gender_dict.keys()))
+
 if st.sidebar.button("🚀 분석 실행"):
-    err, df = get_data(api_key, age_dict[selected_age], selected_lib_code)
+    err, df = get_data(api_key, age_dict[selected_age], gender_dict[selected_gender], selected_lib_code)
     if err: st.error(err)
     else:
-        st.success(f"✅ {main_region} {selected_sub} - {selected_lib_name} 결과")
+        st.success(f"✅ {main_region} {selected_sub} - {selected_lib_name} ({selected_age}/{selected_gender}) 결과")
         st.dataframe(df, use_container_width=True, hide_index=True)
