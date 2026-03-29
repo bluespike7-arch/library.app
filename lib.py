@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 
 st.set_page_config(page_title="우리 동네 도서관 분석", layout="wide")
 
-# --- 데이터 가져오기 함수 (pageSize를 100으로 변경) ---
+# --- 데이터 가져오기 함수 ---
 def get_data(api_key, age="", gender="", lib_code="", region_code="", size=30):
     if not api_key: return "API 키를 먼저 입력해주세요.", None
     url = "http://data4library.kr/api/loanItemSrch"
@@ -17,7 +17,7 @@ def get_data(api_key, age="", gender="", lib_code="", region_code="", size=30):
         'authKey': api_key,
         'startDt': last_month.replace(day=1).strftime('%Y-%m-%d'),
         'endDt': last_month.strftime('%Y-%m-%d'),
-        'pageSize': size,  # 요청하신 대로 데이터 개수 조절 가능
+        'pageSize': size,
         'format': 'json',
         'age': age,
         'gender': gender,
@@ -31,18 +31,24 @@ def get_data(api_key, age="", gender="", lib_code="", region_code="", size=30):
         docs = res.get('response', {}).get('docs', [])
         if not docs: return "데이터가 없습니다.", None
         
+        # 'vol' 항목 안에 있는 'loan_count'가 누적 대출수입니다.
         df = pd.DataFrame([
             {
                 '순위': i['doc']['ranking'], 
                 '도서명': i['doc']['bookname'], 
                 '저자': i['doc']['authors'], 
-                '대출건수': i['doc']['loan_count'],
+                '이달의 대출건수': i['doc']['loan_count'],
+                '누적 대출수': i['doc'].get('vol', '0'), # API의 vol 필드가 누적 대출수를 담고 있는 경우가 많습니다.
                 '출판사': i['doc']['publisher']
             } for i in docs
         ])
+        
+        # 만약 API 응답 구조에 따라 'vol'이 아닌 다른 곳에 있다면 아래와 같이 처리할 수 있습니다.
+        # 대부분의 인기도서 API 응답에서 i['doc']['loan_count']는 조회 기간 내 건수입니다.
+        
         return None, df
-    except:
-        return "데이터를 가져오는 중 오류가 발생했습니다.", None
+    except Exception as e:
+        return f"데이터를 가져오는 중 오류가 발생했습니다: {e}", None
 
 @st.cache_data
 def get_library_list(api_key, region_code, sub_region_name=None):
@@ -78,11 +84,11 @@ st.title("📚 전국 도서관 대출 데이터 분석")
 st.sidebar.header("🔑 인증 및 빠른 조회")
 api_key = st.sidebar.text_input("API 인증키 입력", type="password")
 
-# --- 수정된 부분: 인기도서 100 버튼 ---
+# --- 인기도서 100 버튼 ---
 st.sidebar.markdown("---")
 st.sidebar.subheader("🌟 퀵 메뉴")
 if st.sidebar.button("🏆 전국 통합 인기 도서 100"):
-    err, df = get_data(api_key, size=100) # size를 100으로 전달
+    err, df = get_data(api_key, size=100)
     if err: st.error(err)
     else:
         st.subheader("🔥 대한민국 전체 도서관 인기 도서 (TOP 100)")
