@@ -5,14 +5,21 @@ from datetime import datetime, timedelta
 
 st.set_page_config(page_title="우리 동네 도서관 분석", layout="wide")
 
-# --- 1. 인기도서 가져오기 함수 (기존) ---
-def get_data(api_key, age="", gender="", lib_code="", region_code="", size=30):
-    if not api_key: return "API 키를 먼저 입력해주세요.", None
+# ==========================================
+# 🔐 API 인증키 설정 (여기에 직접 입력)
+# ==========================================
+AUTH_KEY = "여기에_발급받은_인증키를_붙여넣으세요"
+# ==========================================
+
+# --- 1. 인기도서 가져오기 함수 ---
+def get_data(age="", gender="", lib_code="", region_code="", size=30):
     url = "http://data4library.kr/api/loanItemSrch"
     last_month = datetime.now().replace(day=1) - timedelta(days=1)
     params = {
-        'authKey': api_key, 'startDt': last_month.replace(day=1).strftime('%Y-%m-%d'),
-        'endDt': last_month.strftime('%Y-%m-%d'), 'pageSize': size, 'format': 'json',
+        'authKey': AUTH_KEY, 
+        'startDt': last_month.replace(day=1).strftime('%Y-%m-%d'),
+        'endDt': last_month.strftime('%Y-%m-%d'), 
+        'pageSize': size, 'format': 'json',
         'age': age, 'gender': gender, 'libCode': lib_code, 'region': region_code
     }
     try:
@@ -27,12 +34,11 @@ def get_data(api_key, age="", gender="", lib_code="", region_code="", size=30):
         return None, df
     except: return "오류가 발생했습니다.", None
 
-# --- 2. 도서 명칭으로 누적 대출수 검색 함수 (신규) ---
-def search_book_by_name(api_key, book_name):
-    if not api_key: return "API 키를 입력하세요.", None
+# --- 2. 도서 명칭으로 누적 대출수 검색 함수 ---
+def search_book_by_name(book_name):
     url = "http://data4library.kr/api/srchBooks"
     params = {
-        'authKey': api_key, 'title': book_name, 'exactMatch': 'false',
+        'authKey': AUTH_KEY, 'title': book_name, 'exactMatch': 'false',
         'pageSize': 10, 'format': 'json'
     }
     try:
@@ -47,16 +53,15 @@ def search_book_by_name(api_key, book_name):
                 '저자': i['doc']['authors'],
                 '출판사': i['doc']['publisher'],
                 '출판년도': i['doc']['publication_year'],
-                '전국 누적 대출수': i['doc']['loanCount'] # srchBooks API의 누적 대출수 필드
+                '전국 누적 대출수': i['doc']['loanCount']
             })
         return None, pd.DataFrame(search_results)
     except: return "검색 중 오류가 발생했습니다.", None
 
 @st.cache_data
-def get_library_list(api_key, region_code, sub_region_name=None):
-    if not api_key: return {}
+def get_library_list(region_code, sub_region_name=None):
     url = "http://data4library.kr/api/libSrch"
-    params = {'authKey': api_key, 'region': region_code, 'format': 'json', 'pageSize': 1000}
+    params = {'authKey': AUTH_KEY, 'region': region_code, 'format': 'json', 'pageSize': 1000}
     try:
         response = requests.get(url, params=params).json()
         libs = response.get('response', {}).get('libs', [])
@@ -68,32 +73,27 @@ def get_library_list(api_key, region_code, sub_region_name=None):
 # --- UI 레이아웃 ---
 st.title("📚 전국 도서관 데이터 통합 분석기")
 
-# 사이드바 설정
-st.sidebar.header("🔑 인증 및 퀵 메뉴")
-api_key = st.sidebar.text_input("API 인증키 입력", type="password")
+# 사이드바 설정 (인증키 입력란 삭제)
+st.sidebar.header("🌟 퀵 메뉴")
 
 if st.sidebar.button("🏆 전국 통합 인기 도서 100 조회"):
-    err, df = get_data(api_key, size=100)
+    err, df = get_data(size=100)
     if err: st.error(err)
     else:
         st.subheader("🔥 대한민국 전체 도서관 인기 도서 (TOP 100)")
         st.dataframe(df, use_container_width=True, hide_index=True)
 
-# --- 신규: 도서 명칭 검색 섹션 ---
 st.sidebar.markdown("---")
 st.sidebar.subheader("🔍 특정 도서 누적 조회")
 search_query = st.sidebar.text_input("조회할 도서명을 입력하세요")
 if st.sidebar.button("📖 대출수 조회"):
     if search_query:
-        err, df = search_book_by_name(api_key, search_query)
+        err, df = search_book_by_name(search_query)
         if err: st.error(err)
         else:
             st.subheader(f"✅ '{search_query}' 검색 결과 (누적 대출수)")
             st.dataframe(df, use_container_width=True, hide_index=True)
-    else:
-        st.warning("도서명을 입력해주세요.")
 
-# --- 기존 상세 지역 분석 섹션 ---
 st.sidebar.markdown("---")
 st.sidebar.subheader("📍 상세 지역 분석")
 REGION_DATA = {
@@ -104,7 +104,7 @@ REGION_DATA = {
 
 main_region = st.sidebar.selectbox("광역시/도 선택", list(REGION_DATA.keys()))
 selected_sub = st.sidebar.selectbox(f"{main_region} 세부 지역", ["전체"] + REGION_DATA[main_region]["sub"])
-lib_list = get_library_list(api_key, REGION_DATA[main_region]["code"], selected_sub) if api_key else {}
+lib_list = get_library_list(REGION_DATA[main_region]["code"], selected_sub)
 selected_lib_name = st.sidebar.selectbox("도서관 선택", ["해당 지역 전체"] + list(lib_list.keys()))
 selected_lib_code = lib_list.get(selected_lib_name, "")
 
@@ -112,7 +112,7 @@ age_dict = {"전체": "", "20대": "20", "30대": "30", "40대": "40", "50대": 
 selected_age = st.sidebar.selectbox("연령대 선택", list(age_dict.keys()))
 
 if st.sidebar.button("🚀 지역 분석 실행"):
-    err, df = get_data(api_key, age_dict[selected_age], "", selected_lib_code, size=30)
+    err, df = get_data(age_dict[selected_age], "", selected_lib_code, size=30)
     if err: st.error(err)
     else:
         st.subheader(f"✅ {main_region} {selected_sub} 결과")
