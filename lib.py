@@ -3,12 +3,7 @@ import pandas as pd
 import streamlit as st
 from datetime import datetime, timedelta
 
-# 초기 사이드바 상태를 'expanded'(펼침)로 설정
-st.set_page_config(
-    page_title="우리 동네 도서관 분석", 
-    layout="wide", 
-    initial_sidebar_state="expanded"  # 이 부분을 추가했습니다.
-)
+st.set_page_config(page_title="우리 동네 도서관 분석", layout="wide")
 
 # ==========================================
 # 🔐 API 인증키 설정 (여기에 직접 입력)
